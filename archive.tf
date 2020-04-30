@@ -12,7 +12,9 @@ data "external" "archive" {
     runtime = var.runtime
     package_manager = var.package_manager
     package_lock_file = var.package_lock_file
-    yum_packages = jsonencode(var.yum_packages)
+    pre_install_docker_commands = jsonencode(var.pre_install_docker_commands)
+    extra_package_manager_args = var.extra_package_manager_args
+    docker_image = var.docker_image
   }
 }
 

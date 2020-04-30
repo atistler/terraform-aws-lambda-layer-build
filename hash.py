@@ -109,7 +109,9 @@ module_relpath = query['module_relpath']
 runtime = query['runtime']
 package_manager = query['package_manager']
 package_lock_file = query['package_lock_file']
-yum_packages = json.loads(query['yum_packages'])
+pre_install_docker_commands = json.loads(query['pre_install_docker_commands'])
+extra_package_manager_args = query['extra_package_manager_args']
+docker_image = query['docker_image']
 
 # Change working directory to the module path
 # so references to build.py will work.
@@ -121,6 +123,10 @@ os.chdir(module_relpath)
 content_hash = generate_content_hash(build_paths + [package_lock_file])
 content_hash.update(runtime.encode())
 content_hash.update(build_command.encode())
+content_hash.update(package_manager.encode())
+content_hash.update(package_lock_file.encode())
+content_hash.update(extra_package_manager_args.encode())
+content_hash.update(docker_image.encode())
 
 # Generate a unique filename based on the hash.
 filename = 'builds/{content_hash}.zip'.format(
@@ -133,7 +139,9 @@ replacements = {
     '$runtime': runtime,
     '$package_manager': package_manager,
     '$package_lock_file': package_lock_file,
-    '$yum_packages': json.dumps(yum_packages)
+    '$pre_install_docker_commands': json.dumps(pre_install_docker_commands),
+    '$extra_package_manager_args': extra_package_manager_args,
+    '$docker_image': docker_image
 }
 for old, new in replacements.items():
     build_command = build_command.replace(old, new)

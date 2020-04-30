@@ -1,6 +1,3 @@
-# Builds a zip file from the source_dir or source_file.
-# Installs dependencies with poetry/pip automatically.
-
 import os
 import shlex
 import shutil
@@ -87,12 +84,11 @@ def tempdir():
     """
 
     path = tempfile.mkdtemp(prefix='terraform-aws-lambda-', dir='tmp')
-    print(path)
     try:
         yield path
     finally:
-        print("not removing")
-        # shutil.rmtree(path)
+        print("Removing: {}".format(path))
+        shutil.rmtree(path)
 
 
 def create_zip_file(source_dir, target_file):
@@ -121,81 +117,110 @@ def dequote(value):
     return ' '.join(shlex.split(value))
 
 
-filename = dequote(sys.argv[1])
-runtime = dequote(sys.argv[2])
-package_manager = dequote(sys.argv[3])
-package_lock_file = dequote(sys.argv[4])
-yum_packages = json.loads(sys.argv[5])
-absolute_filename = os.path.abspath(filename)
+def handle_nodejs_runtime(temp_dir, runtime, package_manager, package_lock_file):
+    if package_manager != 'npm' and package_manager != 'yarn':
+        print("Invalid package_manager: {} for runtime {}".format(package_manager, runtime))
+        sys.exit(1)
+    if package_manager == 'npm' and not package_lock_file.endswith('package-lock.json'):
+        print("Invalid package_lock_file for package_manager npm, must use package-lock.json, not {}".format(
+            package_lock_file))
+        sys.exit(1)
+    if package_manager == 'yarn' and not package_lock_file.endswith('yarn.lock'):
+        print("Invalid package_lock_file for package_manager yarn, must use yarn.lock, not {}".format(
+            package_lock_file))
+    if not os.path.isfile(package_lock_file):
+        print("package_lock_file does not exist: {}".format(package_lock_file))
+        sys.exit(1)
+    package_json_file = os.path.join(os.path.dirname(package_lock_file), 'package.json')
+    if not os.path.isfile(package_json_file):
+        print(
+            "Could not find package.json file in same directory as package_lock_file: {}".format(package_json_file))
+    runtime_dir = os.path.join(temp_dir, 'nodejs')
+    print("Creating runtime directory: {}".format(runtime_dir))
+    os.makedirs(runtime_dir)
+    print("Copying {} to {}".format(package_lock_file, os.path.join(runtime_dir, 'poetry.lock')))
+    cp(package_lock_file, runtime_dir)
+    print("Copying {} to {}".format(package_json_file, runtime_dir))
+    cp(package_json_file, runtime_dir)
+    return runtime_dir
 
-# Create a temporary directory for building the archive,
-# so no changes will be made to the source directory.
-with tempdir() as temp_dir:
-    if runtime.startswith('python'):
-        if package_manager != 'poetry':
-            print("Invalid package_manager: {} for runtime {}".format(package_manager, runtime))
-            sys.exit(1)
-        if not package_lock_file.endswith('poetry.lock'):
-            print("Invalid package_lock_file for package_manager poetry, must use poetry.lock, not {}".format(
-                package_lock_file))
-            sys.exit(1)
-        if not os.path.isfile(package_lock_file):
-            print("package_lock_file does not exist: {}".format(package_lock_file))
-            sys.exit(1)
-        pyproject_file = os.path.join(os.path.dirname(package_lock_file), 'pyproject.toml')
-        if not os.path.isfile(pyproject_file):
-            print("Could not find pyproject.toml file in same directory as package_lock_file: {}".format(pyproject_file))
-        runtime_dir = os.path.join(temp_dir, 'python/lib/{}/site-packages/'.format(runtime))
-        print("Creating runtime directory: {}".format(runtime_dir))
-        os.makedirs(runtime_dir)
-        print("Copying {} to {}".format(package_lock_file, os.path.join(runtime_dir, 'poetry.lock')))
-        cp(package_lock_file, runtime_dir)
-        print("Copying {} to {}".format(pyproject_file, runtime_dir))
-        cp(pyproject_file, runtime_dir)
-    if runtime.startswith('node'):
-        if package_manager != 'npm' and package_manager != 'yarn':
-            print("Invalid package_manager: {} for runtime {}".format(package_manager, runtime))
-            sys.exit(1)
-        if package_manager == 'npm' and not package_lock_file.endswith('package-lock.json'):
-            print("Invalid package_lock_file for package_manager npm, must use package-lock.json, not {}".format(
-                package_lock_file))
-            sys.exit(1)
-        if package_manager == 'yarn' and not package_lock_file.endswith('yarn.lock'):
-            print("Invalid package_lock_file for package_manager yarn, must use yarn.lock, not {}".format(
-                package_lock_file))
-        if not os.path.isfile(package_lock_file):
-            print("package_lock_file does not exist: {}".format(package_lock_file))
-            sys.exit(1)
-        package_json_file = os.path.join(os.path.dirname(package_lock_file), 'package.json')
-        if not os.path.isfile(package_json_file):
-            print("Could not find package.json file in same directory as package_lock_file: {}".format(package_json_file))
-        runtime_dir = os.path.join(temp_dir, 'nodejs')
-        print("Creating runtime directory: {}".format(runtime_dir))
-        os.makedirs(runtime_dir)
-        print("Copying {} to {}".format(package_lock_file, os.path.join(runtime_dir, 'poetry.lock')))
-        cp(package_lock_file, runtime_dir)
-        print("Copying {} to {}".format(package_json_file, runtime_dir))
-        cp(package_json_file, runtime_dir)
-    with cd(runtime_dir):
-        if package_manager == 'poetry':
-            run('poetry export -f requirements.txt -o requirements.txt', shell=True)
-            if runtime.startswith('python3'):
-                pip_cmd = 'pip3'
-            else:
-                pip_cmd = 'pip2'
-            install_cmd = '{} install --prefix= -r requirements.txt --target .'.format(pip_cmd)
-        elif package_manager == 'yarn':
-            install_cmd = 'yarn install --production'
-        elif package_manager == 'npm':
-            install_cmd = 'npm install --production'
 
-        docker_cmd = 'docker run --rm -v "$PWD":/var/task lambci/lambda:build-{}'.format(runtime)
-        yum_cmd = ''
-        if yum_packages:
-            yum_cmd = 'yum install -y {} && '.format(' '.join(yum_packages))
-        run('{} {} {}'.format(docker_cmd, yum_cmd, install_cmd), shell=True)
+def handle_python_runtime(temp_dir, runtime, package_manager, package_lock_file):
+    if package_manager != 'poetry':
+        print("Invalid package_manager: {} for runtime {}".format(package_manager, runtime))
+        sys.exit(1)
+    if not package_lock_file.endswith('poetry.lock'):
+        print("Invalid package_lock_file for package_manager poetry, must use poetry.lock, not {}".format(
+            package_lock_file))
+        sys.exit(1)
+    if not os.path.isfile(package_lock_file):
+        print("package_lock_file does not exist: {}".format(package_lock_file))
+        sys.exit(1)
+    pyproject_file = os.path.join(os.path.dirname(package_lock_file), 'pyproject.toml')
+    if not os.path.isfile(pyproject_file):
+        print(
+            "Could not find pyproject.toml file in same directory as package_lock_file: {}".format(
+                pyproject_file))
+    runtime_dir = os.path.join(temp_dir, 'python/lib/{}/site-packages/'.format(runtime))
+    print("Creating runtime directory: {}".format(runtime_dir))
+    os.makedirs(runtime_dir)
+    print("Copying {} to {}".format(package_lock_file, os.path.join(runtime_dir, 'poetry.lock')))
+    cp(package_lock_file, runtime_dir)
+    print("Copying {} to {}".format(pyproject_file, runtime_dir))
+    cp(pyproject_file, runtime_dir)
+    return runtime_dir
 
-    # Zip up the temporary directory and write it to the target filename.
-    # This will be used by the Lambda function as the source code package.
-    create_zip_file(temp_dir, absolute_filename)
-    print('Created {}'.format(absolute_filename))
+
+def main():
+    filename = dequote(sys.argv[1])
+    runtime = dequote(sys.argv[2])
+    package_manager = dequote(sys.argv[3])
+    package_lock_file = dequote(sys.argv[4])
+    pre_install_docker_commands = json.loads(sys.argv[5])
+    extra_package_manager_args = dequote(sys.argv[6])
+    docker_image = dequote(sys.argv[7])
+    absolute_filename = os.path.abspath(filename)
+
+    # Create a temporary directory for building the archive,
+    # so no changes will be made to the source directory.
+    with tempdir() as temp_dir:
+        if runtime.startswith('python'):
+            runtime_dir = handle_python_runtime(temp_dir, runtime, package_manager, package_lock_file)
+        elif runtime.startswith('node'):
+            runtime_dir = handle_nodejs_runtime(temp_dir, runtime, package_manager, package_lock_file)
+        else:
+            print('Unsupported runtime: {}'.format(runtime))
+            exit(1)
+
+        with cd(runtime_dir):
+            if package_manager == 'poetry':
+                run('poetry export -f requirements.txt -o requirements.txt', shell=True)
+                if runtime.startswith('python3'):
+                    pip_cmd = 'pip3'
+                else:
+                    pip_cmd = 'pip2'
+                install_cmd = '{} install --prefix= -r requirements.txt --target .'.format(pip_cmd)
+            elif package_manager == 'yarn':
+                install_cmd = 'yarn install --production'
+            elif package_manager == 'npm':
+                install_cmd = 'npm install --production'
+
+            if extra_package_manager_args:
+                install_cmd = ' '.join([install_cmd, extra_package_manager_args])
+            if not docker_image:
+                docker_image = 'lambci/lambda:build-{}'.format(runtime)
+
+            install_commands = pre_install_docker_commands + [install_cmd]
+            pre_install_docker_commands.append(install_cmd)
+            docker_cmd = 'docker run --rm -v "$PWD":/var/task {}'.format(docker_image)
+            commands = ' '.join([docker_cmd, ' && '.join(install_commands)])
+            run(commands, shell=True)
+
+        # Zip up the temporary directory and write it to the target filename.
+        # This will be used by the Lambda function as the source code package.
+        create_zip_file(temp_dir, absolute_filename)
+        print('Created {}'.format(absolute_filename))
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,22 @@
+{
+  "name": "tagger",
+  "version": "1.0.0",
+  "description": "Multi-Cloud resource tagging application",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rackerlabs/tagger.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/rackerlabs/tagger/issues"
+  },
+  "homepage": "https://github.com/rackerlabs/tagger#readme",
+  "dependencies": {
+    "lodash": "4.17.15"
+  }
+}

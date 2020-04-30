@@ -16,23 +16,21 @@ Supported runtimes / package managers are:
 Example:
 ```hcl-terraform
 module "dependencies" {
-  source = "git://github.com/atistler/terraform-aws-lambda-layer-build.git"
+  source = "github.com/atistler/terraform-aws-lambda-layer-build.git"
   layer_name = "my-dependencies"
   package_lock_file = "${path.cwd}/../poetry.lock"
   package_manager = "poetry"
   runtime = "python3.6"
-  yum_packages = [
-    "postgresql-devel"]
+  pre_install_docker_commands = ["yum install -y postgresql-devel"]
 }
 
 resource "aws_lambda_function" "tagger" {
-  function_name = "${local.prefix}-tagger"
-  role = module.tagger_role.this_iam_role_arn
-  s3_bucket = aws_s3_bucket_object.src.bucket
-  s3_key = aws_s3_bucket_object.src.key
-  handler = "services.tagger.handler.lambda_handler"
+  function_name = "my-function"
+  role = "some_role_arn"
+  s3_bucket = "some_bucket"
+  s3_key = "some_key"
+  handler = "handler.lambda_handler"
   runtime = "python3.6"
-  source_code_hash = data.archive_file.src.output_base64sha256
   layers = [
     module.dependencies.layer_arn
   ]
@@ -87,7 +85,7 @@ Description: The command to run to create the Lambda package zip file
 
 Type: `string`
 
-Default: `"python build.py '$filename' '$runtime' '$package_manager' '$package_lock_file' '$yum_packages'"`
+Default: `"python build.py '$filename' '$runtime' '$package_manager' '$package_lock_file' '$pre_install_docker_commands'"`
 
 ### build\_paths
 
