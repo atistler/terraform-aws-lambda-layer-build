@@ -212,7 +212,7 @@ def main():
 
             install_commands = pre_install_docker_commands + [install_cmd]
             pre_install_docker_commands.append(install_cmd)
-            docker_cmd = 'docker run --rm -v "$PWD":/var/task {} &&'.format(docker_image)
+            docker_cmd = 'docker run --rm -v "$PWD":/var/task {}'.format(docker_image)
             commands = ' '.join([docker_cmd, ' && '.join(install_commands)])
             run(commands, shell=True)
 
