@@ -88,7 +88,7 @@ def tempdir():
         yield path
     finally:
         print("Removing: {}".format(path))
-        # shutil.rmtree(path)
+        shutil.rmtree(path)
 
 
 def create_zip_file(source_dir, target_file):
