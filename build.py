@@ -199,11 +199,11 @@ def main():
                     pip_cmd = 'pip3'
                 else:
                     pip_cmd = 'pip2'
-                install_cmd = '{} install --prefix= -r requirements.txt --target .'.format(pip_cmd)
+                install_cmd = '/bin/sh -c cd /var/task && {} install --prefix= -r requirements.txt --target .'.format(pip_cmd)
             elif package_manager == 'yarn':
-                install_cmd = 'yarn install --production'
+                install_cmd = '/bin/sh -c cd /var/task && yarn install --production'
             elif package_manager == 'npm':
-                install_cmd = 'npm install --production'
+                install_cmd = '/bin/sh -c cd /var/task && npm install --production'
 
             if extra_package_manager_args:
                 install_cmd = ' '.join([install_cmd, extra_package_manager_args])
@@ -212,7 +212,7 @@ def main():
 
             install_commands = pre_install_docker_commands + [install_cmd]
             pre_install_docker_commands.append(install_cmd)
-            docker_cmd = 'docker run --rm -v "$PWD":/var/task {} /bin/sh -c cd /var/task &&'.format(docker_image)
+            docker_cmd = 'docker run --rm -v "$PWD":/var/task {} &&'.format(docker_image)
             commands = ' '.join([docker_cmd, ' && '.join(install_commands)])
             run(commands, shell=True)
 
