@@ -88,7 +88,7 @@ def tempdir():
         yield path
     finally:
         print("Removing: {}".format(path))
-        shutil.rmtree(path)
+        # shutil.rmtree(path)
 
 
 def create_zip_file(source_dir, target_file):
@@ -212,7 +212,7 @@ def main():
 
             install_commands = pre_install_docker_commands + [install_cmd]
             pre_install_docker_commands.append(install_cmd)
-            docker_cmd = 'docker run --rm -v "$PWD":/var/task {}'.format(docker_image)
+            docker_cmd = 'docker run --rm -v "$PWD":/var/task {} /bin/sh -c cd /var/task &&'.format(docker_image)
             commands = ' '.join([docker_cmd, ' && '.join(install_commands)])
             run(commands, shell=True)
 
