@@ -28,6 +28,9 @@ resource "null_resource" "archive" {
     command = lookup(data.external.archive.result, "build_command")
     working_dir = path.module
   }
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 # Check that the null_resource.archive file has been built. This will rebuild
