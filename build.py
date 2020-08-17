@@ -194,7 +194,7 @@ def main():
 
         with cd(runtime_dir):
             if package_manager == 'poetry':
-                run('poetry export -f requirements.txt -o requirements.txt', shell=True)
+                run('poetry export --without-hashes -f requirements.txt -o requirements.txt', shell=True)
                 if runtime.startswith('python3'):
                     pip_cmd = 'pip3'
                 else:
