@@ -5,4 +5,7 @@ resource "aws_lambda_layer_version" "this" {
     null_resource.archive]
   compatible_runtimes = [
     var.runtime]
+  lifecycle {
+    create_before_destroy = true
+  }
 }
